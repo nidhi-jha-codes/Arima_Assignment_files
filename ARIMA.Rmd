@@ -1,0 +1,119 @@
+---
+title: "Arima_Assignment"
+output: html_document
+date: "2023-11-22"
+---
+
+### To Load the Data and update the column names.
+```{r}
+library(readxl)
+MyDf=read_excel("TimeSeriesData_LiquourSales.xls")
+
+colnames(MyDf) <- c("Date", "Sales")
+
+MyDf$Date <- as.Date(MyDf$Date)
+```
+
+
+### Converting the Data into Time series and plotting it along with ACF.
+```{r}
+library(fpp)
+library(fpp2)
+library(forecast)
+
+#Converting data into TimeSeries:
+
+Tsales <- ts(MyDf$Sales, start = c(2018,1), end = c(2023,7), frequency = 12)
+
+plot(Tsales)
+
+Acf(Tsales)
+```
+
+## To check if Time series is stationary.
+
+#### ADF test says differences is required if p-value is > 0.05. This means we need to try differencing the time series to achieve stationarity.
+
+```{r}
+adf.test(Tsales)
+```
+
+
+### Since this Time series is seasonal, we will use function nsdiffs.
+#### NSDIFFS = 1 means differencing the series by subtracting each observation from the corresponding observation in the previous year. 
+```{r}
+nsdiffs(Tsales)
+ndiffs(Tsales) #For non-seasonal data()
+
+# tsdisplay plots ACF,PACF and timeseries plot together.
+
+tsdisplay(Tsales)
+
+timeseriesdiff1 <- diff(Tsales, differences=1)
+plot(timeseriesdiff1)
+
+```
+
+### To check if more difference is needed:
+
+```{r}
+tsdisplay(timeseriesdiff1)
+```
+
+### Using Auto-Arima Model and plotting it.
+
+
+```{r}
+auto_fit <- auto.arima(Tsales, trace=TRUE, stepwise = FALSE)
+
+auto_fit
+attributes(auto_fit)
+```
+#### Best model: ARIMA(0,1,2)(0,1,1)[12] 
+
+##### Explanation: The notation "ARIMA(0,1,2)(0,1,1)[12]" represents a specific type of time series forecasting model in the context of ARIMA (AutoRegressive Integrated Moving Average) models with seasonality. Let's break down each component:
+
+##### ARIMA(p, d, q): 
+###### p: Order of the autoregressive (AR) component.
+###### d: Degree of differencing (non-seasonal).
+###### q: Order of the moving average (MA) component.
+###### In the notation "ARIMA(0,1,2)", it means there is no autoregressive component (p=0), first-order differencing is applied (d=1), and there are two lagged moving average terms (q=2). This implies that the model includes two lagged values of the differenced series in the moving average part.
+
+##### Seasonal Component (SARIMA):
+
+###### (P, D, Q)[s]: Seasonal order components.
+###### P: Seasonal autoregressive order.
+###### D: Seasonal degree of differencing.
+###### Q: Seasonal moving average order.
+###### s: Seasonal period (e.g., 12 for monthly data).
+###### In the notation "(0,1,1)[12]", it means there is no seasonal autoregressive component (P=0), first-order seasonal differencing is applied (D=1), one lagged value of the seasonally differenced series is included in the seasonal moving average part (Q=1), and the seasonal period is 12 (indicating monthly data).
+
+##### Putting it all together, "ARIMA(0,1,2)(0,1,1)[12]" represents a seasonal ARIMA model where first-order differencing is applied both non-seasonally and seasonally, and the model includes lagged moving average terms in both the non-seasonal and seasonal components. 
+
+
+### Plot the forecast for next 5 years
+
+```{r}
+F_Arima<-forecast(auto_fit,h=5,level=c(99.5))
+
+plot(F_Arima)
+```
+
+### Residual Analysis
+```{r}
+Acf(auto_fit$residuals)
+plot.ts(residuals(auto_fit))
+hist(auto_fit$residuals)
+tsdiag(auto_fit)
+```
+##### ACF- All the points are below significant line, so they dont have any correaltion.
+##### Plot- There is no significant pattern shown between the residual.
+##### Histogram- It is also, normaly distributed, mean is close to zero which is a good thing.
+ 
+### Accuracy For ARIMA model
+
+##### MAPE is approximately 2.0483%, providing a percentage measure of accuracy.
+```{r}
+accuracy(F_Arima)
+```
+
